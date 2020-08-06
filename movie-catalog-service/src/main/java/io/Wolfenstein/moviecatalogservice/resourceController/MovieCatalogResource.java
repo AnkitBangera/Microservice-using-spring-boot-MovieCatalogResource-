@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,18 +21,21 @@ import io.Wolfenstein.moviecatalogservice.model.UserRating;
 public class MovieCatalogResource {
 	@Autowired
 	private WebClient.Builder webClientBuilder;
-
+	
+	@Autowired
+	private DiscoveryClient discoveryClient;//can return multiple  port number , multiple  service id list of same instance
+	
 	@Autowired 
 	private RestTemplate restTemplate;
 	
 	@GetMapping("/{userId}")
 	public List<CatalogItem> getCatalog(@PathVariable String userId) {
 		
-		UserRating userRatings=restTemplate.getForObject("http://localhost:8082/rating/user/"+userId, UserRating.class);
+		UserRating userRatings=restTemplate.getForObject("http://rating-data-service/rating/user/"+userId, UserRating.class);
 		
 		
 		return userRatings.getRating().stream().map(rating->{
-			Movie movie=restTemplate.getForObject("http://localhost:8081/movie/"+rating.getMovieId(), Movie.class);
+			Movie movie=restTemplate.getForObject("http://movie-info-service/movie/"+rating.getMovieId(), Movie.class);
 				
 			/*Movie movie=webClientBuilder.build()//using builder pattern ang giving us the client
 			.get()//type of method get,post,put................
