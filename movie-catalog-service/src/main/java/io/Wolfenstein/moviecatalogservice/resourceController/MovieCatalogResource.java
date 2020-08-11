@@ -1,5 +1,6 @@
 package io.Wolfenstein.moviecatalogservice.resourceController;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,9 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+
 import io.Wolfenstein.moviecatalogservice.model.CatalogItem;
 import io.Wolfenstein.moviecatalogservice.model.Movie;
 import io.Wolfenstein.moviecatalogservice.model.UserRating;
+import io.Wolfenstein.moviecatalogservice.service.MovieInfo;
+import io.Wolfenstein.moviecatalogservice.service.UserRatingInfo;
 
 @RestController
 @RequestMapping("/catalog")
@@ -34,10 +39,23 @@ public class MovieCatalogResource {
 	@Autowired
 	private HttpEntity<Movie> entity;
 	
+	@Autowired
+	private MovieInfo movieInfo;
+	
+	@Autowired
+	private UserRatingInfo userRatingInfo;
+	
+	
 	@GetMapping("/{userId}")
+	//@HystrixCommand(fallbackMethod="getFallbackCatalog")//this service is a possible contender for circuit breaker as it is calling multile services so we 
+					//add @HystrixCommand annotation
+	//fallbackMethod="getFallbackCatalog" if getCatalog method fails it will call getFallbackCatalog
+	//to execute the method. This getFallbackCatalog should be hard coded or should take data from cache memory
+	//or else we have to so fall back method of getFallbackCatalog itself which is bad
+	
 	public List<CatalogItem> getCatalog(@PathVariable String userId) {
 		
-		UserRating userRatings=restTemplate.getForObject("http://rating-data-service/rating/user/"+userId, UserRating.class);
+		UserRating userRatings=userRatingInfo.getUserRatingInfo(userId);
 	/*	HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		String accessToken="eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwMWJiY2RhYzFjYzY1YjExYWQ3NzY5OTJjMjNkODRlYyIsInN1YiI6IjVmMmU5OGVlMGMwYjM4MDAzMmRlMGU4OCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.OH7xmsIn4Y2bSWPxp1jAXtqG1tG5-z5EN9qMwE1Esg8";
@@ -48,7 +66,7 @@ public class MovieCatalogResource {
 		
 		return userRatings.getRating().stream().map(rating->{
 		//	Movie movie=restTemplate.getForObject("http://movie-info-service/movies/"+rating.getMovieId(), Movie.class);
-			Movie movie = restTemplate.postForObject("http://movie-info-service/movies/"+rating.getMovieId(), entity, Movie.class);
+			 return movieInfo.getCatalogItem(rating);
 			/*Movie movie=webClientBuilder.build()//using builder pattern ang giving us the client
 			.get()//type of method get,post,put................
 			.uri("http://localhost:8081/movie/"+rating.getMovieId())//which url to call
@@ -57,9 +75,12 @@ public class MovieCatalogResource {
 			.block();//it block the flow as its a async method bodyToMono() doesn't return. 
 */			
 			
-			return new CatalogItem(movie.getMovieId(), movie.getDescription(), rating.getRating());
+			//return new CatalogItem(movie.getMovieId(), movie.getDescription(), rating.getRating());
 			})
 		 
 		.collect(Collectors.toList());
 	}
+	/*public List<CatalogItem> getFallbackCatalog(@PathVariable String userId) {
+		return Arrays.asList(new CatalogItem("No movie", "", 0));
+	}*/
 }
